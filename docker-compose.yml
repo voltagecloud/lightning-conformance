@@ -19,7 +19,7 @@ services:
 
   lnd:
     container_name: lnd
-    image: lightninglabs/lnd:v0.15.0-beta
+    image: lightninglabs/lnd:v0.15.1-beta
     user: 1000:1000
     depends_on:
       - bitcoin
@@ -30,8 +30,8 @@ services:
     restart: unless-stopped
     stop_grace_period: 5m30s
     ports:
-      - "9735" # p2p
-      - "10009" # grpc
+      - 9735 # p2p
+      - 4000:10009 # grpc
 
   lightning-hub:
     container_name: cln-hub

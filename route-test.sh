@@ -3,11 +3,12 @@
 before=$(docker exec lnd lncli --network=regtest fwdinghistory | jq '.last_offset_index' -r)
 
 addr_r=$(docker exec cln-remote lightning-cli --network=regtest getinfo | jq '.id' -r)
+addr_hub=$(docker exec cln-hub lightning-cli --network=regtest getinfo | jq '.id' -r)
 addr_c1=$(docker exec cln-c1 lightning-cli --network=regtest getinfo | jq '.id' -r)
 addr_lnd=$(docker exec lnd lncli --network=regtest getinfo | jq '.identity_pubkey' -r)
 
 echo "C1 to Remote invoice"
-invoice=$(docker exec cln-c1 lightning-cli --network=regtest invoice $RANDOM `gdate +%s%N` description | jq '.bolt11' -r)
+invoice=$(docker exec cln-c1 lightning-cli --network=regtest invoice $RANDOM `date +%s%N` description | jq '.bolt11' -r)
 docker exec cln-remote lightning-cli --network=regtest pay $invoice
 
 echo "Keysend"
@@ -19,20 +20,25 @@ invoice=$(docker exec lnd lncli --network=regtest addinvoice 1219923 | jq '.paym
 docker exec cln-remote lightning-cli --network=regtest pay $invoice
 
 echo "Send some sats from lnd to each of its buddies"
-invoice_c1=$(docker exec cln-c1 lightning-cli --network=regtest invoice $RANDOM `gdate +%s%N` description | jq '.bolt11' -r)
-invoice_remote=$(docker exec cln-remote lightning-cli --network=regtest invoice $RANDOM `gdate +%s%N` description | jq '.bolt11' -r)
+invoice_c1=$(docker exec cln-c1 lightning-cli --network=regtest invoice $RANDOM `date +%s%N` description | jq '.bolt11' -r)
+invoice_remote=$(docker exec cln-remote lightning-cli --network=regtest invoice $RANDOM `date +%s%N` description | jq '.bolt11' -r)
 docker exec lnd lncli --network=regtest payinvoice -f $invoice_c1
 docker exec lnd lncli --network=regtest payinvoice -f $invoice_remote
 
-echo "Do some onchain"
-addr=$(docker exec cln-hub lightning-cli --network=regtest newaddr bech32 | jq '.bech32' -r)
-docker exec lnd lncli --network=regtest sendcoins "$addr" $RANDOM
+
+echo "Forwarding through lnd"
+invoice_remote=$(docker exec cln-remote lightning-cli --network=regtest invoice $RANDOM `date +%s%N` description | jq '.bolt11' -r)
+docker exec cln-c1 lightning-cli --network=regtest pay $invoice_remote
 
 after=$(docker exec lnd lncli --network=regtest fwdinghistory | jq '.last_offset_index' -r)
 
 let diff=$after-$before
 echo "Successfully sent - routed $diff transactions"
 
+
+echo "Do some onchain"
+addr=$(docker exec cln-hub lightning-cli --network=regtest newaddr bech32 | jq '.bech32' -r)
+docker exec lnd lncli --network=regtest sendcoins "$addr" $RANDOM
 
 
 # remote -> lnd -> c1
